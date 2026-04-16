@@ -21,7 +21,7 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE BÚSQUEDA TIPO ACCESS ---
+# --- 2. LÓGICA DE BÚSQUEDA ---
 def buscar_coincidencias(df, term):
     if not term:
         return df
@@ -33,7 +33,7 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS para la interfaz oscura
+    # Estilo CSS general
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
@@ -43,7 +43,7 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # TU ENLACE DE GOOGLE DRIVE (SHEETS)
+    # ENLACE DE GOOGLE SHEETS
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
     @st.cache_data(ttl=60)
@@ -53,7 +53,7 @@ if check_password():
             df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
             df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
             df_raw['DESCRIPCIÓN'] = df_raw['DESCRIPCIÓN'].astype(str)
-            # Limpiar precios por si traen símbolos de moneda como texto
+            # Limpiar formato de moneda para evitar errores de cálculo
             for col in ['PÚBLICO', 'DISTRIBUIDOR']:
                 if col in df_raw.columns:
                     df_raw[col] = pd.to_numeric(df_raw[col].astype(str).str.replace('[$,]', '', regex=True), errors='coerce').fillna(0)
@@ -66,11 +66,10 @@ if check_password():
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: 28px;'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Escriba palabras (ej: mezcladora cromo)...")
+        busqueda = st.text_input("", placeholder="Escriba palabras (ej: monomando fregadero)...")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
-        # AQUÍ SE DEFINEN LAS COLUMNAS (Para evitar el NameError)
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
@@ -83,7 +82,7 @@ if check_password():
             
             opciones = df_filtrado['DESCRIPCIÓN'].tolist()
             if opciones:
-                seleccionado = st.selectbox("🎯 Seleccione un producto para ver detalle completo:", opciones)
+                seleccionado = st.selectbox("🎯 Seleccione un producto de la lista para ver detalle completo:", opciones)
                 item = df_filtrado[df_filtrado['DESCRIPCIÓN'] == seleccionado].iloc[0]
             else:
                 item = None
@@ -92,7 +91,7 @@ if check_password():
             st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>DETALLES</h2>", unsafe_allow_html=True)
             
             if item is not None:
-                # Extraemos datos limpios
+                # Extraemos variables
                 desc = item.get('DESCRIPCIÓN', 'N/A')
                 precio_pub = item.get('PÚBLICO', 0)
                 precio_dist = item.get('DISTRIBUIDOR', 0)
@@ -100,36 +99,30 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
-                # Renderizado de la tarjeta de información
-                st.markdown(f"""
-                <div class="info-box">
-                    <p class="label-blue">DESCRIPCIÓN</p>
-                    <p style="font-size: 18px; color: white;">{desc}</p>
-                    <hr style="border-color: #5bc0de;">
-                    
-                    <p class="label-blue">PRECIO PÚBLICO</p>
-                    <p style="font-size: 45px; font-weight: bold; color: #00ff00; margin-top: -10px;">
-                        $ {precio_pub:,.2f}
-                    </p>
-                    
-                    <br>
-                    <details style="color: #888; cursor: pointer;">
-                        <summary>Ver Precio Distribuidor</summary>
-                        <div style="margin-top: 15px; background-color: #1e1e1e; padding: 15px; border-radius: 5px; border: 1px solid #ff4b4b;">
-                            <p style="color: #ff4b4b; font-weight: bold; margin-bottom: 0;">COSTO DISTRIBUIDOR</p>
-                            <p style="font-size: 28px; font-weight: bold; color: white; margin-top: 0;">
-                                $ {precio_dist:,.2f}
-                            </p>
-                        </div>
-                    </details>
-                    
-                    <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 11px; color: #777;">
-                        ID: {id_prod} | Libro: {libro} <br>
-                        Actualizado: {fecha}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # Renderizado sin indentación para evitar que Markdown lo tome como bloque de código
+                html_card = f"""
+<div class="info-box">
+<p class="label-blue">DESCRIPCIÓN</p>
+<p style="font-size: 18px; color: white;">{desc}</p>
+<hr style="border-color: #5bc0de;">
+<p class="label-blue">PRECIO PÚBLICO</p>
+<p style="font-size: 45px; font-weight: bold; color: #00ff00; margin-top: -10px;">$ {precio_pub:,.2f}</p>
+<br>
+<details style="color: #888; cursor: pointer;">
+<summary>Ver Precio Distribuidor</summary>
+<div style="margin-top: 15px; background-color: #1e1e1e; padding: 15px; border-radius: 5px; border: 1px solid #ff4b4b;">
+<p style="color: #ff4b4b; font-weight: bold; margin-bottom: 0;">COSTO DISTRIBUIDOR</p>
+<p style="font-size: 28px; font-weight: bold; color: white; margin-top: 0;">$ {precio_dist:,.2f}</p>
+</div>
+</details>
+<div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 11px; color: #777;">
+ID: {id_prod} | Libro: {libro} <br>
+Actualizado: {fecha}
+</div>
+</div>
+"""
+                st.markdown(html_card, unsafe_allow_html=True)
             else:
                 st.info("💡 Busque un producto y elíjalo en la lista desplegable.")
 
-        st.caption("Ferretería Ovalle v2.4 - Sistema Multi-sucursal")
+        st.caption("Ferretería Ovalle v2.5 - Sistema Multi-sucursal")
