@@ -5,21 +5,23 @@ import configparser
 import streamlit.components.v1 as components
 
 # --- 1. CONFIGURACIÓN DE SEGURIDAD DINÁMICA ---
-# REEMPLAZA ESTO CON TU ENLACE AL ARCHIVO psw.ini
-URL_PSW_INI = "https://drive.google.com/file/d/1ULOFZxqVsiC0qpSmnj0y2jk-YGIT6OUo/view?usp=sharing"
+# Enlace convertido para lectura directa desde Google Drive
+URL_PSW_INI = "https://drive.google.com/uc?export=download&id=1ULOFZxqVsiC0qpSmnj0y2jk-YGIT6OUo"
 
-@st.cache_data(ttl=60) # Revisa el archivo cada 60 segundos
+@st.cache_data(ttl=60) # Revisa si el archivo INI cambió cada 60 segundos
 def obtener_password():
     try:
         response = requests.get(URL_PSW_INI, timeout=10)
         if response.status_code == 200:
             config = configparser.ConfigParser()
+            # Leemos el texto crudo del archivo INI
             config.read_string(response.text)
-            # Busca la sección [SEGURIDAD] y el valor 'password'
+            # Buscamos la sección y el valor de la contraseña
+            # (Asegúrate de que el archivo tenga la etiqueta [SEGURIDAD] al inicio)
             return config.get('SEGURIDAD', 'password', fallback="ovalle2026")
     except Exception as e:
         print(f"Error al leer INI: {e}")
-    # Contraseña de emergencia por si el enlace del INI se cae
+    # Contraseña de respaldo por si el enlace o Drive fallan
     return "ovalle2026"
 
 def check_password():
@@ -52,7 +54,7 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS Adaptable
+    # Estilo CSS Adaptable (Responsive)
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
@@ -66,16 +68,20 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # Inyección de JS para la tecla ESC
+    # --- INYECCIÓN DE JAVASCRIPT PARA TECLADO (ESC) ---
     components.html("""
         <script>
         const doc = window.parent.document;
         doc.addEventListener('keydown', function(e) {
+            // Si el usuario presiona la tecla Escape
             if (e.key === 'Escape') {
                 const searchBox = doc.querySelector('.stTextInput input');
                 if (searchBox) {
+                    // Borramos el contenido visual
                     searchBox.value = '';
+                    // Disparamos el evento para que Streamlit se entere del borrado
                     searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Forzamos el foco de vuelta al cuadro de búsqueda
                     searchBox.focus();
                 }
             }
@@ -113,7 +119,7 @@ if check_password():
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            st.caption("⌨️ Tip: Usa Flechas ⬇️⬆️ y presiona **ESPACIO** para seleccionar. Presiona **ESC** para limpiar.")
+            st.caption("⌨️ Tip: Usa Flechas ⬇️⬆️ y presiona **ESPACIO** para seleccionar. Presiona **ESC** para regresar.")
             evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
@@ -128,6 +134,7 @@ if check_password():
             
             item = None
             
+            # Lógica de Selección:
             if len(evento_seleccion.selection.rows) > 0:
                 idx = evento_seleccion.selection.rows[0]
                 item = df_filtrado.iloc[idx]
@@ -167,4 +174,4 @@ Actualizado: {fecha}
             else:
                 st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
 
-        st.caption("Ferretería Ovalle v2.8.2 - Seguridad Dinámica y Teclado")
+        st.caption("Ferretería Ovalle v2.9 - Teclado Adaptativo y Configuración Dinámica")
