@@ -63,30 +63,53 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # --- INYECCIÓN DE JS AVANZADA (Fase de Captura) ---
+    # --- INYECCIÓN DE JS MAESTRO (ENTER y ESCAPE) ---
     components.html("""
         <script>
         const doc = window.parent.document;
         
-        // El 'true' al final fuerza a atrapar la tecla ESC ANTES de que la tabla la secuestre
-        doc.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
+        // Evitamos inyectar los eventos múltiples veces si Streamlit recarga
+        if (!doc.ferreteriaHacksLoaded) {
+            doc.addEventListener('keydown', function(e) {
                 const searchBox = doc.querySelector('.stTextInput input');
-                if (searchBox) {
-                    // 1. Detenemos que la tabla reaccione al Escape
-                    e.stopPropagation();
-                    e.preventDefault();
-                    
-                    // 2. Truco para forzar a React a aceptar el borrado de texto
-                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    nativeInputValueSetter.call(searchBox, '');
-                    
-                    // 3. Avisamos al sistema y forzamos el foco
-                    searchBox.dispatchEvent(new Event('input', { bubbles: true }));
-                    searchBox.focus();
+                
+                // --- ACCIÓN 1: TECLA ESCAPE ---
+                if (e.key === 'Escape') {
+                    if (searchBox) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        
+                        // Borramos el texto
+                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeInputValueSetter.call(searchBox, '');
+                        
+                        // Forzamos actualización y enfoque
+                        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                        searchBox.focus();
+                    }
                 }
-            }
-        }, true);
+                
+                // --- ACCIÓN 2: TECLA ENTER ---
+                if (e.key === 'Enter' && doc.activeElement === searchBox) {
+                    // Guardamos una bandera en la memoria del navegador indicando que hay que enfocar la tabla
+                    sessionStorage.setItem('moverFocoTabla', 'true');
+                }
+            }, true);
+            
+            // Ciclo que vigila si debe mover el foco a la tabla (después de que Streamlit cargue)
+            setInterval(() => {
+                if (sessionStorage.getItem('moverFocoTabla') === 'true') {
+                    // El componente DataFrame de Streamlit usa un Canvas internamente
+                    const tablaCanvas = doc.querySelector('[data-testid="stDataFrame"] canvas');
+                    if (tablaCanvas) {
+                        tablaCanvas.focus(); // Pasamos el control a la tabla
+                        sessionStorage.removeItem('moverFocoTabla'); // Borramos la orden
+                    }
+                }
+            }, 150); // Revisa cada milisegundo si la tabla ya apareció
+            
+            doc.ferreteriaHacksLoaded = true; // Marcamos que el Hack ya está activo
+        }
         </script>
         """, height=0)
 
@@ -113,14 +136,14 @@ if check_password():
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Escriba y presione Enter. (Use ESC para regresar y limpiar)")
+        busqueda = st.text_input("", placeholder="Escriba, presione ENTER para ir a la lista. (ESC para reiniciar)")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            st.caption("⌨️ Tip: Usa Flechas ⬇️⬆️ y presiona **ESPACIO** para seleccionar. Presiona **ESC** para limpiar búsqueda.")
+            st.caption("⌨️ Navegación: Flechas ⬇️⬆️ para moverse | **ESPACIO** para seleccionar | **ESC** para nueva búsqueda")
             evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
@@ -135,7 +158,6 @@ if check_password():
             
             item = None
             
-            # Lógica de Selección:
             if len(evento_seleccion.selection.rows) > 0:
                 idx = evento_seleccion.selection.rows[0]
                 item = df_filtrado.iloc[idx]
@@ -175,4 +197,4 @@ Actualizado: {fecha}
             else:
                 st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
 
-        st.caption("Ferretería Ovalle v2.9.1 - Control Maestro de ESC")
+        st.caption("Ferretería Ovalle v3.1 - Navegación de Alta Velocidad")
