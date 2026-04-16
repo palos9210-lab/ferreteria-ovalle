@@ -4,6 +4,7 @@ import requests
 from io import BytesIO
 
 # --- 1. CONFIGURACIÓN DE SEGURIDAD ---
+# Clave para entrar al sistema en las sucursales
 PASSWORD_CORRECTA = "ovalle2026"
 
 def check_password():
@@ -24,45 +25,42 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DEL SISTEMA ---
+# --- 2. LÓGICA PRINCIPAL ---
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo visual oscuro
+    # Estilo visual oscuro y profesional
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
-        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 22px; }
+        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 22px; font-weight: bold; }
         .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
-        .label-blue { color: #5bc0de; font-weight: bold; }
+        .label-blue { color: #5bc0de; font-weight: bold; margin-bottom: 0px; }
         </style>
         """, unsafe_allow_html=True)
 
-    # URL DIRECTA RECONSTRUIDA (Usando el ID c0d8e1e31398ed93)
-    EXCEL_URL = "https://onedrive.live.com/download?resid=C0D8E1E31398ED93&authkey=!ANP_9uNqh76zPHY"
+    # TRANSFORMACIÓN DEL LINK:
+    # Tu link original: https://1drv.ms/x/c/c0d8e1e31398ed93/IQAoxcm-TFyiSI10iie0BXszAVfjm5UJhorCr5yaxRntqkY?e=cgx4qc
+    # El siguiente formato fuerza la descarga directa del archivo Excel:
+    EXCEL_URL = "https://onedrive.live.com/download?resid=C0D8E1E31398ED93&authkey=!ACjFyb5MXKJIjXQ&em=2"
 
-    @st.cache_data(ttl=300)
+    @st.cache_data(ttl=300) # Se actualiza cada 5 minutos
     def cargar_datos():
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36'}
         try:
-            # Intentamos la descarga con la librería requests que es más flexible
-            response = requests.get(EXCEL_URL, headers=headers, timeout=15)
-            
+            response = requests.get(EXCEL_URL, headers=headers, timeout=20)
             if response.status_code == 200:
-                # Si la descarga es exitosa (Código 200)
+                # Leemos el archivo usando BytesIO y el motor openpyxl
                 df_raw = pd.read_excel(BytesIO(response.content), engine='openpyxl')
                 
-                # Normalizar nombres de columnas (Quitar espacios y pasar a MAYÚSCULAS)
+                # Normalizamos nombres de columnas (Sin espacios y en Mayúsculas)
                 df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
                 
-                # Asegurar que las columnas clave existan (con o sin tilde)
+                # Manejo de tildes para las columnas que usa el sistema
                 df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
                 return df_raw
             else:
-                st.error(f"Error {response.status_code}: OneDrive no autorizó la descarga.")
-                st.info("Sugerencia: Abre el Excel en OneDrive y verifica que esté compartido para 'Cualquier persona con el vínculo'.")
+                st.error(f"Error {response.status_code}: No se pudo conectar con el archivo de OneDrive.")
                 return None
         except Exception as e:
             st.error(f"Error de conexión: {e}")
@@ -71,12 +69,11 @@ if check_password():
     df = cargar_datos()
 
     if df is not None:
-        st.markdown("<h1 style='color: white;'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='color: white; font-size: 28px;'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
         busqueda = st.text_input("", placeholder="Escriba descripción, ID o palabra clave...")
 
-        # Filtrado de datos
+        # Filtrado inteligente
         if busqueda:
-            # Buscamos en todas las columnas para facilitar el trabajo en sucursal
             mask = df.astype(str).apply(lambda x: x.str.contains(busqueda, case=False)).any(axis=1)
             df_filtrado = df[mask]
         else:
@@ -85,10 +82,10 @@ if check_password():
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            # Mostramos las columnas solicitadas
-            columnas_a_mostrar = [c for c in ['ID', 'DESCRIPCIÓN', 'DISTRIBUIDOR', 'PÚBLICO'] if c in df_filtrado.columns]
+            # Columnas indicadas: Id, DESCRIPCIÓN, DISTRIBUIDOR y PÚBLICO
+            cols_ver = [c for c in ['ID', 'DESCRIPCIÓN', 'DISTRIBUIDOR', 'PÚBLICO'] if c in df_filtrado.columns]
             st.dataframe(
-                df_filtrado[columnas_a_mostrar], 
+                df_filtrado[cols_ver], 
                 use_container_width=True, 
                 height=600,
                 hide_index=True
@@ -122,13 +119,13 @@ if check_password():
                         </div>
                     </details>
                     
-                    <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 12px; color: #777;">
+                    <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 11px; color: #777;">
                         Libro: {item.get('LIBRO', 'N/A')} <br>
-                        Última actualización: {item.get('FECHA ACTUALIZACION', 'N/A')}
+                        Fecha de actualización: {item.get('FECHA ACTUALIZACION', 'N/A')}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.info("Ingrese un término de búsqueda para ver el detalle.")
+                st.info("Escriba en el buscador superior para ver el detalle de un producto.")
 
-        st.caption("Ferretería Ovalle v1.2 - Sistema de Consulta Multi-sucursal")
+        st.caption("Ferretería Ovalle v1.3 - Sistema de Consulta Web")
