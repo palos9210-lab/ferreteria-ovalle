@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # --- 1. CONFIGURACIÓN DE SEGURIDAD DINÁMICA ---
 # REEMPLAZA ESTO CON TU ENLACE AL ARCHIVO psw.ini
-URL_PSW_INI = "PEGAR_AQUI_EL_ENLACE_AL_ARCHIVO_INI"
+URL_PSW_INI = "https://drive.google.com/file/d/1ULOFZxqVsiC0qpSmnj0y2jk-YGIT6OUo/view?usp=sharing"
 
 @st.cache_data(ttl=60) # Revisa el archivo cada 60 segundos
 def obtener_password():
