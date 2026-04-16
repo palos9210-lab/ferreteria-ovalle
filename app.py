@@ -49,9 +49,20 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS Adaptable
+    # Estilo CSS Adaptable + BLOQUEO DE SCROLL
     st.markdown("""
         <style>
+        /* Bloquear el scroll de la página completa (Comportamiento de App de Escritorio) */
+        html, body, [data-testid="stAppViewContainer"] {
+            overflow: hidden !important;
+        }
+        /* Ajustar los márgenes superiores para aprovechar el espacio anclado */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 1rem !important;
+            max-height: 100vh;
+        }
+        
         .main { background-color: #1e1e1e; }
         .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; font-weight: bold; }
         .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
@@ -192,6 +203,12 @@ ID: {id_prod} | Libro: {libro} <br>
 Actualizado: {fecha}
 </div>
 </div>
+"""
+                st.markdown(html_card, unsafe_allow_html=True)
+            else:
+                st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
+
+        st.caption("Ferretería Ovalle v3.1.1 - Vista Anclada")
 """
                 st.markdown(html_card, unsafe_allow_html=True)
             else:
