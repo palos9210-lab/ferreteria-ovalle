@@ -21,7 +21,7 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE BÚSQUEDA ---
+# --- 2. LÓGICA DE BÚSQUEDA TIPO ACCESS ---
 def buscar_coincidencias(df, term):
     if not term:
         return df
@@ -33,22 +33,25 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS ADAPTABLE y limpieza de diseño
+    # Estilo CSS Adaptable (Responsive)
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
-        .stTextInput > div > div > input, .stSelectbox > div > div > div { 
-            background-color: #ffffff !important; color: black !important; font-size: 18px !important; font-weight: bold !important; 
-        }
+        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; font-weight: bold; }
         .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
         .label-blue { color: #5bc0de; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+        
+        /* Ajuste de textos según el tamaño de pantalla */
         .desc-text { font-size: clamp(16px, 2vw, 20px); color: white; line-height: 1.4; }
         .precio-publico { font-size: clamp(35px, 5vw, 50px); font-weight: bold; color: #00ff00; margin-top: -10px; }
         .precio-dist { font-size: clamp(22px, 4vw, 28px); font-weight: bold; color: white; }
+        
+        /* Quitar espacios de Markdown */
+        .stMarkdown div { line-height: 1.2; }
         </style>
         """, unsafe_allow_html=True)
 
-    # ENLACE DE GOOGLE SHEETS
+    # ENLACE DE GOOGLE SHEETS (CSV)
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
     @st.cache_data(ttl=60)
@@ -58,49 +61,51 @@ if check_password():
             df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
             df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
             df_raw['DESCRIPCIÓN'] = df_raw['DESCRIPCIÓN'].astype(str)
+            
             for col in ['PÚBLICO', 'DISTRIBUIDOR']:
                 if col in df_raw.columns:
                     df_raw[col] = pd.to_numeric(df_raw[col].astype(str).str.replace('[$,]', '', regex=True), errors='coerce').fillna(0)
             return df_raw
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error en base de datos: {e}")
             return None
 
     df = cargar_datos()
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="1. Escriba para filtrar la lista...")
+        busqueda = st.text_input("", placeholder="Escriba y presione Enter para el primer resultado...")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
+        # Layout adaptable
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            # Mostramos la tabla solo como referencia visual (sin selección para evitar errores)
-            st.dataframe(
+            st.caption("⌨️ Tip: Usa Flechas para moverte y ESPACIO para seleccionar")
+            evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
-                height=400,
-                hide_index=True
+                height=500,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
             )
-            
-            # EL SELECTOR MÁGICO (Punto clave para el Enter)
-            # Este componente responde perfectamente a Flechas y Enter
-            opciones = df_filtrado['DESCRIPCIÓN'].tolist()
-            if opciones:
-                seleccionado = st.selectbox(
-                    "🎯 2. Use FLECHAS y presione ENTER para seleccionar el producto:", 
-                    opciones,
-                    index=0 # Por defecto selecciona el primero de la búsqueda
-                )
-                item = df_filtrado[df_filtrado['DESCRIPCIÓN'] == seleccionado].iloc[0]
-            else:
-                item = None
 
         with col_info:
             st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px; font-size: clamp(18px, 2.5vw, 24px);'>DETALLES</h2>", unsafe_allow_html=True)
             
+            item = None
+            
+            # Lógica de Selección:
+            # 1. Si el usuario seleccionó una fila (Mouse o Espacio)
+            if len(evento_seleccion.selection.rows) > 0:
+                idx = evento_seleccion.selection.rows[0]
+                item = df_filtrado.iloc[idx]
+            # 2. Selección automática al presionar Enter en el buscador (muestra el primero)
+            elif not df_filtrado.empty and busqueda:
+                item = df_filtrado.iloc[0]
+
             if item is not None:
                 desc = item.get('DESCRIPCIÓN', 'N/A')
                 precio_pub = item.get('PÚBLICO', 0)
@@ -109,6 +114,7 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
+                # Renderizado HTML limpio y pegado al margen para evitar bloques de código
                 html_card = f"""
 <div class="info-box">
 <p class="label-blue">DESCRIPCIÓN</p>
@@ -120,7 +126,7 @@ if check_password():
 <details style="color: #888; cursor: pointer;">
 <summary>Ver Precio Distribuidor</summary>
 <div style="margin-top: 15px; background-color: #1e1e1e; padding: 15px; border-radius: 5px; border: 1px solid #ff4b4b;">
-<p style="color: #ff4b4b; font-weight: bold; margin-bottom: 0;">COSTO DISTRIBUIDOR</p>
+<p style="color: #ff4b4b; font-weight: bold; margin-bottom: 0; font-size: 0.9em;">COSTO DISTRIBUIDOR</p>
 <p class="precio-dist">$ {precio_dist:,.2f}</p>
 </div>
 </details>
@@ -132,6 +138,6 @@ Actualizado: {fecha}
 """
                 st.markdown(html_card, unsafe_allow_html=True)
             else:
-                st.info("💡 Escriba en el buscador para filtrar.")
+                st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
 
-        st.caption("Ferretería Ovalle v3.0 - Control Total por Teclado")
+        st.caption("Ferretería Ovalle v2.8 - Optimizado para Teclado y Dispositivos")
