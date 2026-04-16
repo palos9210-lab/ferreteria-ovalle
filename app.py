@@ -21,7 +21,7 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE BÚSQUEDA TIPO ACCESS ---
+# --- 2. LÓGICA DE BÚSQUEDA ---
 def buscar_coincidencias(df, term):
     if not term:
         return df
@@ -33,25 +33,20 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS Adaptable (Responsive)
+    # Estilo CSS Adaptable
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
         .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; font-weight: bold; }
         .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
         .label-blue { color: #5bc0de; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
-        
-        /* Ajuste de textos según el tamaño de pantalla */
         .desc-text { font-size: clamp(16px, 2vw, 20px); color: white; line-height: 1.4; }
         .precio-publico { font-size: clamp(35px, 5vw, 50px); font-weight: bold; color: #00ff00; margin-top: -10px; }
         .precio-dist { font-size: clamp(22px, 4vw, 28px); font-weight: bold; color: white; }
-        
-        /* Quitar espacios de Markdown */
-        .stMarkdown div { line-height: 1.2; }
         </style>
         """, unsafe_allow_html=True)
 
-    # ENLACE DE GOOGLE SHEETS (CSV)
+    # ENLACE DE GOOGLE SHEETS
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
     @st.cache_data(ttl=60)
@@ -74,7 +69,13 @@ if check_password():
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Escriba y presione Enter para el primer resultado...")
+        
+        # Fila de búsqueda principal
+        col_busqueda, col_id = st.columns([3, 1])
+        with col_busqueda:
+            busqueda = st.text_input("", placeholder="1. Filtra por descripción (ej: monomando negro)...")
+        with col_id:
+            id_directo = st.text_input("⚡", placeholder="2. Escribe el ID y presiona Enter...")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
@@ -82,7 +83,7 @@ if check_password():
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            st.caption("⌨️ Tip: Usa Flechas para moverte y ESPACIO para seleccionar")
+            st.info("💡 **Tabla:** Usa flechas ⬇️⬆️ y presiona **ESPACIO** para seleccionar (El Enter aquí solo expande texto).")
             evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
@@ -97,12 +98,20 @@ if check_password():
             
             item = None
             
-            # Lógica de Selección:
-            # 1. Si el usuario seleccionó una fila (Mouse o Espacio)
-            if len(evento_seleccion.selection.rows) > 0:
+            # LÓGICA DE PRIORIDAD DE SELECCIÓN:
+            # 1. Si escribió un ID exacto en la casilla rápida (Permite usar Enter)
+            if id_directo:
+                # Buscamos ese ID exacto en la base de datos completa
+                match_id = df[df['ID'].astype(str) == id_directo.strip()]
+                if not match_id.empty:
+                    item = match_id.iloc[0]
+                else:
+                    st.warning("⚠️ ID no encontrado.")
+            # 2. Si marcó la casilla con el Espacio (o Mouse) en la tabla
+            elif len(evento_seleccion.selection.rows) > 0:
                 idx = evento_seleccion.selection.rows[0]
                 item = df_filtrado.iloc[idx]
-            # 2. Selección automática al presionar Enter en el buscador (muestra el primero)
+            # 3. Mostrar el primer resultado de la búsqueda textual por defecto
             elif not df_filtrado.empty and busqueda:
                 item = df_filtrado.iloc[0]
 
@@ -114,7 +123,6 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
-                # Renderizado HTML limpio y pegado al margen para evitar bloques de código
                 html_card = f"""
 <div class="info-box">
 <p class="label-blue">DESCRIPCIÓN</p>
@@ -138,6 +146,6 @@ Actualizado: {fecha}
 """
                 st.markdown(html_card, unsafe_allow_html=True)
             else:
-                st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
+                st.info("💡 Escriba para buscar o seleccione un producto.")
 
-        st.caption("Ferretería Ovalle v2.8 - Optimizado para Teclado y Dispositivos")
+        st.caption("Ferretería Ovalle v2.9 - Selección Ágil")
