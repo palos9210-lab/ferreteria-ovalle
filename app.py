@@ -30,7 +30,7 @@ if check_password():
 
     @st.cache_data(ttl=300) # Actualiza cada 5 minutos
     def cargar_datos():
-        return pd.read_excel(https://1drv.ms/x/c/c0d8e1e31398ed93/ESjFyb5MXKJIjXSKJ7QFezMBAD3_9uNqh76zPHYfiaq4-g?e=0XJ5Nz&download=1)
+        return pd.read_excel("https://1drv.ms/x/c/c0d8e1e31398ed93/ESjFyb5MXKJIjXSKJ7QFezMBAD3_9uNqh76zPHYfiaq4-g?e=0XJ5Nz&download=1")
 
     try:
         df = cargar_datos()
