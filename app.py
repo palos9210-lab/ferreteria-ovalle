@@ -1,8 +1,5 @@
 import streamlit as st
 import pandas as pd
-import requests
-from io import BytesIO
-import base64
 
 # --- 1. CONFIGURACIÓN DE SEGURIDAD ---
 PASSWORD_CORRECTA = "ovalle2026"
@@ -24,46 +21,39 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE DATOS ---
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # URL base de compartir (la que me pasaste anteriormente)
-    url_compartir = "https://1drv.ms/x/c/c0d8e1e31398ed93/IQAoxcm-TFyiSI10iie0BXszAVfjm5UJhorCr5yaxRntqkY?e=cgx4qc"
+    # Estilo visual
+    st.markdown("""
+        <style>
+        .main { background-color: #1e1e1e; }
+        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; }
+        .info-box { border: 2px solid #5bc0de; padding: 20px; border-radius: 10px; background-color: #262730; color: white; }
+        </style>
+        """, unsafe_allow_html=True)
 
-    def crear_url_directa(url):
-        # Este método convierte el link de compartir en un link de descarga directa "limpio"
-        base64_enqueue = base64.b64encode(url.encode("utf-8")).decode("utf-8")
-        final_share_url = "https://api.onedrive.com/v1.0/shares/u!" + base64_enqueue.rstrip("=").replace("/", "_").replace("+", "-") + "/root/content"
-        return final_share_url
+    # REEMPLAZA ESTE LINK por el que obtuviste al "Publicar en la web" (CSV)
+    # Ejemplo: https://docs.google.com/spreadsheets/d/e/2PACX-1v.../pub?output=csv
+    GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
-    @st.cache_data(ttl=300)
+    @st.cache_data(ttl=60) # Se actualiza cada minuto
     def cargar_datos():
-        url_final = crear_url_directa(url_compartir)
-        headers = {'User-Agent': 'Mozilla/5.0'}
         try:
-            response = requests.get(url_final, headers=headers, timeout=20)
-            if response.status_code == 200:
-                df_raw = pd.read_excel(BytesIO(response.content), engine='openpyxl')
-                df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
-                df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
-                return df_raw
-            else:
-                return f"ERROR_{response.status_code}"
+            # Google Sheets entrega el CSV al instante sin pedir contraseñas raras
+            df = pd.read_csv(GSHEET_CSV_URL)
+            df.columns = [str(c).strip().upper() for c in df.columns]
+            df = df.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
+            return df
         except Exception as e:
-            return str(e)
+            return f"Error: {e}"
 
-    datos = cargar_datos()
+    df = cargar_datos()
 
-    if isinstance(datos, str):
-        st.error(f"⚠️ Error de servidor (Microsoft 500/401).")
-        st.write("OneDrive está limitando la conexión. Intentando método alternativo...")
-        # Botón de emergencia para limpiar caché
-        if st.button("🔄 Forzar Reconexión"):
-            st.cache_data.clear()
-            st.rerun()
+    if isinstance(df, str):
+        st.error(f"Error al cargar datos: {df}")
+        st.info("Asegúrate de haber 'Publicado en la web' como CSV.")
     else:
-        df = datos
         st.markdown("<h1 style='color: white;'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
         busqueda = st.text_input("", placeholder="Escriba descripción o código...")
 
@@ -79,20 +69,22 @@ if check_password():
             st.dataframe(df_filtrado[cols_ver], use_container_width=True, height=550, hide_index=True)
         
         with col2:
-            st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>INFORMACIÓN</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>DETALLES</h2>", unsafe_allow_html=True)
             if not df_filtrado.empty and busqueda:
                 item = df_filtrado.iloc[0]
                 st.markdown(f"""
-                <div style="border: 2px solid #5bc0de; padding: 20px; border-radius: 10px; background-color: #262730; color: white;">
+                <div class="info-box">
                     <p style="color: #5bc0de; font-weight: bold;">DESCRIPCIÓN</p>
                     <p style="font-size: 19px;">{item.get('DESCRIPCIÓN', 'N/A')}</p>
                     <hr>
                     <p style="color: #5bc0de; font-weight: bold;">PRECIO PÚBLICO</p>
-                    <p style="font-size: 40px; font-weight: bold; color: #00ff00;">${item.get('PÚBLICO', 0):,.2f}</p>
+                    <p style="font-size: 40px; font-weight: bold; color: #00ff00;">${item.get('PÚBLICO', 0)}</p>
                     <br>
                     <details>
                         <summary style="color: #888; cursor: pointer;">Ver Precio Distribuidor</summary>
-                        <p style="font-size: 24px; color: #ff4b4b;">${item.get('DISTRIBUIDOR', 0):,.2f}</p>
+                        <p style="font-size: 24px; color: #ff4b4b;">${item.get('DISTRIBUIDOR', 0)}</p>
                     </details>
                 </div>
                 """, unsafe_allow_html=True)
+
+    st.caption("Ferretería Ovalle v2.0 - Sistema Estable")
