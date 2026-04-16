@@ -26,7 +26,7 @@ if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
     # URL de tu Excel en OneDrive (Asegúrate que termine en &download=1)
-    EXCEL_URL = "TU_LINK_DE_ONEDRIVE_AQUI"
+    EXCEL_URL = "https://1drv.ms/x/c/c0d8e1e31398ed93/ESjFyb5MXKJIjXSKJ7QFezMBAD3_9uNqh76zPHYfiaq4-g?e=0XJ5Nz&download=1"
 
     @st.cache_data(ttl=300) # Actualiza cada 5 minutos
     def cargar_datos():
