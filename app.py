@@ -33,7 +33,7 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS general
+    # Estilo CSS
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
@@ -53,7 +53,8 @@ if check_password():
             df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
             df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
             df_raw['DESCRIPCIÓN'] = df_raw['DESCRIPCIÓN'].astype(str)
-            # Limpiar formato de moneda para evitar errores de cálculo
+            
+            # Limpiar formato de moneda para cálculos
             for col in ['PÚBLICO', 'DISTRIBUIDOR']:
                 if col in df_raw.columns:
                     df_raw[col] = pd.to_numeric(df_raw[col].astype(str).str.replace('[$,]', '', regex=True), errors='coerce').fillna(0)
@@ -73,25 +74,32 @@ if check_password():
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            st.dataframe(
+            # TABLA INTERACTIVA CORREGIDA
+            # Se usa "single-row" en lugar de "single" para evitar el error de API
+            evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
-                height=450,
-                hide_index=True
+                height=500,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
             )
-            
-            opciones = df_filtrado['DESCRIPCIÓN'].tolist()
-            if opciones:
-                seleccionado = st.selectbox("🎯 Seleccione un producto de la lista para ver detalle completo:", opciones)
-                item = df_filtrado[df_filtrado['DESCRIPCIÓN'] == seleccionado].iloc[0]
-            else:
-                item = None
 
         with col_info:
             st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>DETALLES</h2>", unsafe_allow_html=True)
             
+            item = None
+            
+            # LÓGICA DE SELECCIÓN EXACTA:
+            # 1. Si el usuario hizo clic en una fila, tomar el índice de esa fila
+            if len(evento_seleccion.selection.rows) > 0:
+                indice_seleccionado = evento_seleccion.selection.rows[0]
+                item = df_filtrado.iloc[indice_seleccionado]
+            # 2. Si hay una búsqueda activa pero no ha hecho clic, mostrar el primer resultado
+            elif not df_filtrado.empty and busqueda:
+                item = df_filtrado.iloc[0]
+
             if item is not None:
-                # Extraemos variables
                 desc = item.get('DESCRIPCIÓN', 'N/A')
                 precio_pub = item.get('PÚBLICO', 0)
                 precio_dist = item.get('DISTRIBUIDOR', 0)
@@ -99,7 +107,7 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
-                # Renderizado sin indentación para evitar que Markdown lo tome como bloque de código
+                # Tarjeta HTML sin indentación
                 html_card = f"""
 <div class="info-box">
 <p class="label-blue">DESCRIPCIÓN</p>
@@ -123,6 +131,6 @@ Actualizado: {fecha}
 """
                 st.markdown(html_card, unsafe_allow_html=True)
             else:
-                st.info("💡 Busque un producto y elíjalo en la lista desplegable.")
+                st.info("💡 Busque un producto o haga clic en una fila de la tabla.")
 
-        st.caption("Ferretería Ovalle v2.5 - Sistema Multi-sucursal")
+        st.caption("Ferretería Ovalle v2.6 - Selección Directa Restaurada")
