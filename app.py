@@ -8,7 +8,7 @@ def check_password():
     if "password_ok" not in st.session_state:
         st.session_state["password_ok"] = False
     if not st.session_state["password_ok"]:
-        st.markdown("<h2 style='text-align: center; color: white;'>🔐 Acceso Sistema Ferretería Ovalle</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>🔐 Acceso Sistema Ferretería Ovalle</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             pwd = st.text_input("Introduce la clave de sucursal:", type="password")
@@ -25,9 +25,7 @@ def check_password():
 def buscar_coincidencias(df, term):
     if not term:
         return df
-    # Separamos la búsqueda por palabras (ej: "mezcla cromo" busca ambas palabras en cualquier orden)
     palabras = term.lower().split()
-    # Filtramos: Todas las palabras deben estar presentes en la columna DESCRIPCIÓN
     mask = df['DESCRIPCIÓN'].str.lower().apply(lambda x: all(p in str(x) for p in palabras))
     return df[mask]
 
@@ -35,7 +33,6 @@ def buscar_coincidencias(df, term):
 if check_password():
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo visual que imita tu sistema original
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
@@ -45,78 +42,71 @@ if check_password():
         </style>
         """, unsafe_allow_html=True)
 
-    # ENLACE DE GOOGLE SHEETS PROPORCIONADO
+    # TU ENLACE DE GOOGLE SHEETS
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
-    @st.cache_data(ttl=60) # Sincroniza cambios cada 60 segundos
+    @st.cache_data(ttl=60)
     def cargar_datos():
         try:
-            # Lectura directa desde Google Drive (Sheets)
             df_raw = pd.read_csv(GSHEET_CSV_URL)
-            # Normalización de nombres de columnas (Mayúsculas y sin espacios)
             df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
-            # Homologamos nombres comunes
             df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
-            # Aseguramos que la descripción sea texto para evitar errores de búsqueda
             df_raw['DESCRIPCIÓN'] = df_raw['DESCRIPCIÓN'].astype(str)
             return df_raw
         except Exception as e:
-            st.error(f"Error al conectar con la base de datos de Google: {e}")
+            st.error(f"Error: {e}")
             return None
 
     df = cargar_datos()
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: 28px;'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Escriba palabras del producto (ej: mezcladora fregadero)...")
+        busqueda = st.text_input("", placeholder="Escriba palabras (ej: mezcladora cromo)...")
 
-        # 1. Aplicamos búsqueda flexible (Punto 1: palabras desordenadas)
         df_filtrado = buscar_coincidencias(df, busqueda)
 
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            # 2. Tabla Interactiva (Punto 2: clic para ver info instantánea)
-            seleccion = st.dataframe(
+            # Mostramos la tabla normal (sin selección para evitar el error de API)
+            st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
-                height=600,
-                hide_index=True,
-                on_select="rerun", # Esto permite que al tocar una fila se actualice el panel derecho
-                selection_mode="single"
+                height=450,
+                hide_index=True
             )
+            
+            # Selector manual debajo de la tabla (Esto sustituye el clic en la fila)
+            # Permite elegir el producto exacto de los resultados filtrados
+            opciones = df_filtrado['DESCRIPCIÓN'].tolist()
+            if opciones:
+                seleccionado = st.selectbox("🎯 Seleccione un producto para ver detalle completo:", opciones)
+                item = df_filtrado[df_filtrado['DESCRIPCIÓN'] == seleccionado].iloc[0]
+            else:
+                item = None
 
         with col_info:
-            st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>INFORMACIÓN</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='background-color: #103f54; color: white; padding: 10px;'>DETALLES</h2>", unsafe_allow_html=True)
             
-            item = None
-            # Prioridad 1: Fila seleccionada por el usuario con el mouse
-            if len(seleccion.selection.rows) > 0:
-                idx = seleccion.selection.rows[0]
-                item = df_filtrado.iloc[idx]
-            # Prioridad 2: Si hay búsqueda pero no selección, mostrar el primer resultado
-            elif not df_filtrado.empty and busqueda:
-                item = df_filtrado.iloc[0]
-
             if item is not None:
                 st.markdown(f"""
                 <div class="info-box">
                     <p class="label-blue">DESCRIPCIÓN</p>
-                    <p style="font-size: 20px; font-weight: 500;">{item.get('DESCRIPCIÓN', 'N/A')}</p>
+                    <p style="font-size: 20px;">{item.get('DESCRIPCIÓN', 'N/A')}</p>
                     <hr style="border-color: #5bc0de;">
                     
                     <p class="label-blue">PRECIO PÚBLICO</p>
                     <p style="font-size: 45px; font-weight: bold; color: #00ff00; margin-top: -10px;">
-                        ${item.get('PÚBLICO', 0):,.2f}
+                        ${item.get('PÚBLICO', 0)}
                     </p>
                     
                     <br>
                     <details>
-                        <summary style="color: #888; cursor: pointer;">Ver Precio Distribuidor (Costo)</summary>
+                        <summary style="color: #888; cursor: pointer;">Ver Precio Distribuidor</summary>
                         <div style="margin-top: 15px;">
                             <p class="label-blue" style="color: #ff4b4b;">COSTO DISTRIBUIDOR</p>
                             <p style="font-size: 28px; font-weight: bold;">
-                                ${item.get('DISTRIBUIDOR', 0):,.2f}
+                                ${item.get('DISTRIBUIDOR', 0)}
                             </p>
                         </div>
                     </details>
@@ -128,8 +118,6 @@ if check_password():
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.info("💡 Haz clic en cualquier producto de la tabla para ver su detalle.")
+                st.info("Escriba en el buscador para filtrar y elija un producto.")
 
-        st.caption("Ferretería Ovalle v2.2 - Sistema Web Multi-sucursal (Google Drive)")
-
-        st.caption("Ferretería Ovalle v1.7 - Búsqueda Flexible e Interactiva")
+        st.caption("Ferretería Ovalle v2.3 - Versión Estable")
