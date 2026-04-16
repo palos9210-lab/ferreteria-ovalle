@@ -21,7 +21,7 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE BÚSQUEDA ---
+# --- 2. LÓGICA DE BÚSQUEDA TIPO ACCESS ---
 def buscar_coincidencias(df, term):
     if not term:
         return df
@@ -31,25 +31,27 @@ def buscar_coincidencias(df, term):
 
 # --- 3. INTERFAZ PRINCIPAL ---
 if check_password():
-    # layout="wide" usa toda la pantalla en PC, pero se adapta en móviles
     st.set_page_config(page_title="Búsqueda Ferretería Ovalle", layout="wide")
 
-    # Estilo CSS ADAPTABLE (Responsive)
+    # Estilo CSS Adaptable (Responsive)
     st.markdown("""
         <style>
         .main { background-color: #1e1e1e; }
-        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 18px; font-weight: bold; }
-        .info-box { border: 2px solid #5bc0de; padding: 20px; border-radius: 10px; background-color: #262730; color: white; }
+        .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; font-weight: bold; }
+        .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
         .label-blue { color: #5bc0de; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
         
-        /* Textos dinámicos: grandes en PC, pequeños en celulares */
-        .desc-text { font-size: clamp(16px, 2vw, 20px); color: white; font-weight: 500; }
-        .precio-publico { font-size: clamp(32px, 5vw, 45px); font-weight: bold; color: #00ff00; margin-top: -10px; }
-        .precio-dist { font-size: clamp(22px, 4vw, 28px); font-weight: bold; color: white; margin-top: 0; }
+        /* Ajuste de textos según el tamaño de pantalla */
+        .desc-text { font-size: clamp(16px, 2vw, 20px); color: white; line-height: 1.4; }
+        .precio-publico { font-size: clamp(35px, 5vw, 50px); font-weight: bold; color: #00ff00; margin-top: -10px; }
+        .precio-dist { font-size: clamp(22px, 4vw, 28px); font-weight: bold; color: white; }
+        
+        /* Quitar espacios de Markdown */
+        .stMarkdown div { line-height: 1.2; }
         </style>
         """, unsafe_allow_html=True)
 
-    # ENLACE DE GOOGLE SHEETS
+    # ENLACE DE GOOGLE SHEETS (CSV)
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
     @st.cache_data(ttl=60)
@@ -60,27 +62,27 @@ if check_password():
             df_raw = df_raw.rename(columns={'DESCRIPCION': 'DESCRIPCIÓN', 'PUBLICO': 'PÚBLICO'})
             df_raw['DESCRIPCIÓN'] = df_raw['DESCRIPCIÓN'].astype(str)
             
-            # Limpiar formato monetario
             for col in ['PÚBLICO', 'DISTRIBUIDOR']:
                 if col in df_raw.columns:
                     df_raw[col] = pd.to_numeric(df_raw[col].astype(str).str.replace('[$,]', '', regex=True), errors='coerce').fillna(0)
             return df_raw
         except Exception as e:
-            st.error(f"Error al cargar base de datos: {e}")
+            st.error(f"Error en base de datos: {e}")
             return None
 
     df = cargar_datos()
 
     if df is not None:
-        st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR PRODUCTO:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Ej: monomando (Escribe y presiona Enter)...")
+        st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR:</h1>", unsafe_allow_html=True)
+        busqueda = st.text_input("", placeholder="Escriba y presione Enter para el primer resultado...")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
-        # En PC se divide 60/40. En celular, Streamlit pondrá la información debajo de la tabla
+        # Layout adaptable
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
+            st.caption("⌨️ Tip: Usa Flechas para moverte y ESPACIO para seleccionar")
             evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
@@ -95,11 +97,12 @@ if check_password():
             
             item = None
             
-            # 1. Prioridad: Si el usuario selecciona con el mouse o la barra espaciadora
+            # Lógica de Selección:
+            # 1. Si el usuario seleccionó una fila (Mouse o Espacio)
             if len(evento_seleccion.selection.rows) > 0:
-                indice_seleccionado = evento_seleccion.selection.rows[0]
-                item = df_filtrado.iloc[indice_seleccionado]
-            # 2. SELECCIÓN AUTOMÁTICA (ENTER): Si solo buscó y presionó Enter, selecciona el primero
+                idx = evento_seleccion.selection.rows[0]
+                item = df_filtrado.iloc[idx]
+            # 2. Selección automática al presionar Enter en el buscador (muestra el primero)
             elif not df_filtrado.empty and busqueda:
                 item = df_filtrado.iloc[0]
 
@@ -111,7 +114,7 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
-                # Tarjeta HTML con clases CSS adaptables
+                # Renderizado HTML limpio y pegado al margen para evitar bloques de código
                 html_card = f"""
 <div class="info-box">
 <p class="label-blue">DESCRIPCIÓN</p>
@@ -127,7 +130,7 @@ if check_password():
 <p class="precio-dist">$ {precio_dist:,.2f}</p>
 </div>
 </details>
-<div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 0.85em; color: #777;">
+<div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 10px; font-size: 0.8em; color: #777;">
 ID: {id_prod} | Libro: {libro} <br>
 Actualizado: {fecha}
 </div>
@@ -135,6 +138,6 @@ Actualizado: {fecha}
 """
                 st.markdown(html_card, unsafe_allow_html=True)
             else:
-                st.info("💡 Escriba y presione Enter, o seleccione de la lista.")
+                st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
 
-        st.caption("Ferretería Ovalle v2.7 - Adaptable y Rápido")
+        st.caption("Ferretería Ovalle v2.8 - Optimizado para Teclado y Dispositivos")
