@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import streamlit.components.v1 as components
 
 # --- 1. CONFIGURACIÓN DE SEGURIDAD ---
 PASSWORD_CORRECTA = "ovalle2026"
@@ -21,7 +22,7 @@ def check_password():
         return False
     return True
 
-# --- 2. LÓGICA DE BÚSQUEDA TIPO ACCESS ---
+# --- 2. LÓGICA DE BÚSQUEDA ---
 def buscar_coincidencias(df, term):
     if not term:
         return df
@@ -40,18 +41,35 @@ if check_password():
         .stTextInput > div > div > input { background-color: #ffffff !important; color: black !important; font-size: 20px; font-weight: bold; }
         .info-box { border: 2px solid #5bc0de; padding: 25px; border-radius: 10px; background-color: #262730; color: white; }
         .label-blue { color: #5bc0de; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
-        
-        /* Ajuste de textos según el tamaño de pantalla */
         .desc-text { font-size: clamp(16px, 2vw, 20px); color: white; line-height: 1.4; }
         .precio-publico { font-size: clamp(35px, 5vw, 50px); font-weight: bold; color: #00ff00; margin-top: -10px; }
         .precio-dist { font-size: clamp(22px, 4vw, 28px); font-weight: bold; color: white; }
-        
-        /* Quitar espacios de Markdown */
         .stMarkdown div { line-height: 1.2; }
         </style>
         """, unsafe_allow_html=True)
 
-    # ENLACE DE GOOGLE SHEETS (CSV)
+    # --- INYECCIÓN DE JAVASCRIPT PARA TECLADO (ESC) ---
+    components.html("""
+        <script>
+        const doc = window.parent.document;
+        doc.addEventListener('keydown', function(e) {
+            // Si el usuario presiona la tecla Escape
+            if (e.key === 'Escape') {
+                const searchBox = doc.querySelector('.stTextInput input');
+                if (searchBox) {
+                    // Borramos el contenido visual
+                    searchBox.value = '';
+                    // Disparamos el evento para que React (Streamlit) se entere del borrado
+                    searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Forzamos el foco de vuelta al cuadro de búsqueda
+                    searchBox.focus();
+                }
+            }
+        });
+        </script>
+        """, height=0)
+
+    # ENLACE DE GOOGLE SHEETS
     GSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSS8fd7ccGW_AoCZzYCU0idkGpzDQqsb77NyF1lH7MT6DonkUKQNc3Uu-71Nfe-6w/pub?output=csv"
 
     @st.cache_data(ttl=60)
@@ -74,15 +92,16 @@ if check_password():
 
     if df is not None:
         st.markdown("<h1 style='color: white; font-size: clamp(20px, 3vw, 28px);'>BUSCAR:</h1>", unsafe_allow_html=True)
-        busqueda = st.text_input("", placeholder="Escriba y presione Enter para el primer resultado...")
+        
+        # El cuadro de búsqueda
+        busqueda = st.text_input("", placeholder="Escriba y presione Enter. (Use ESC para limpiar)")
 
         df_filtrado = buscar_coincidencias(df, busqueda)
 
-        # Layout adaptable
         col_tabla, col_info = st.columns([3, 2])
 
         with col_tabla:
-            st.caption("⌨️ Tip: Usa Flechas para moverte y ESPACIO para seleccionar")
+            st.caption("⌨️ Tip: Usa Flechas ⬇️⬆️ y presiona **ESPACIO** para seleccionar. Presiona **ESC** para limpiar búsqueda.")
             evento_seleccion = st.dataframe(
                 df_filtrado[['ID', 'DESCRIPCIÓN', 'PÚBLICO', 'DISTRIBUIDOR']], 
                 use_container_width=True, 
@@ -97,12 +116,9 @@ if check_password():
             
             item = None
             
-            # Lógica de Selección:
-            # 1. Si el usuario seleccionó una fila (Mouse o Espacio)
             if len(evento_seleccion.selection.rows) > 0:
                 idx = evento_seleccion.selection.rows[0]
                 item = df_filtrado.iloc[idx]
-            # 2. Selección automática al presionar Enter en el buscador (muestra el primero)
             elif not df_filtrado.empty and busqueda:
                 item = df_filtrado.iloc[0]
 
@@ -114,7 +130,6 @@ if check_password():
                 libro = item.get('LIBRO', 'N/A')
                 fecha = item.get('FECHA ACTUALIZACION', 'N/A')
 
-                # Renderizado HTML limpio y pegado al margen para evitar bloques de código
                 html_card = f"""
 <div class="info-box">
 <p class="label-blue">DESCRIPCIÓN</p>
@@ -140,4 +155,4 @@ Actualizado: {fecha}
             else:
                 st.info("💡 Escriba para buscar o seleccione una fila de la lista.")
 
-        st.caption("Ferretería Ovalle v2.8 - Optimizado para Teclado y Dispositivos")
+        st.caption("Ferretería Ovalle v2.8.1 - Teclado Optimizado")
